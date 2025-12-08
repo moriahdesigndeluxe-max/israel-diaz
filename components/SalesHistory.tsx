@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Sale, SaleCategory } from '../types';
-import { Search, Filter, Download, Trash2, Pencil, User, MapPin } from 'lucide-react';
+import { Search, Filter, Download, Trash2, Pencil, User, MapPin, Scissors, Palette, MessageCircle, Sparkles, Loader2 } from 'lucide-react';
+import { generateFollowUpMessage } from '../services/geminiService';
 
 interface SalesHistoryProps {
   sales: Sale[];
@@ -11,6 +12,20 @@ interface SalesHistoryProps {
 export const SalesHistory: React.FC<SalesHistoryProps> = ({ sales, onDeleteSale, onEditSale }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState<string>('All');
+  const [filterFabric, setFilterFabric] = useState<string>('All');
+  const [filterColor, setFilterColor] = useState<string>('All');
+  const [loadingMsgId, setLoadingMsgId] = useState<string | null>(null);
+
+  // Extract unique options for dropdowns
+  const uniqueFabrics = useMemo(() => {
+    const fabrics = new Set(sales.map(s => s.fabric).filter((f): f is string => !!f && f.trim() !== ''));
+    return Array.from(fabrics).sort();
+  }, [sales]);
+
+  const uniqueColors = useMemo(() => {
+    const colors = new Set(sales.map(s => s.color).filter((c): c is string => !!c && c.trim() !== ''));
+    return Array.from(colors).sort();
+  }, [sales]);
 
   const filteredSales = useMemo(() => {
     return sales
@@ -22,10 +37,13 @@ export const SalesHistory: React.FC<SalesHistoryProps> = ({ sales, onDeleteSale,
             sale.fabric?.toLowerCase().includes(searchLower);
             
         const matchesCategory = filterCategory === 'All' || sale.category === filterCategory;
-        return matchesSearch && matchesCategory;
+        const matchesFabric = filterFabric === 'All' || sale.fabric === filterFabric;
+        const matchesColor = filterColor === 'All' || sale.color === filterColor;
+
+        return matchesSearch && matchesCategory && matchesFabric && matchesColor;
       })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [sales, searchTerm, filterCategory]);
+  }, [sales, searchTerm, filterCategory, filterFabric, filterColor]);
 
   const handleExport = () => {
     // Generate CSV content
@@ -45,13 +63,41 @@ export const SalesHistory: React.FC<SalesHistoryProps> = ({ sales, onDeleteSale,
     document.body.removeChild(link);
   };
 
+  const handleSmartWhatsApp = async (sale: Sale) => {
+    if (!sale.phone) {
+      alert("Este cliente no tiene número de teléfono registrado.");
+      return;
+    }
+
+    setLoadingMsgId(sale.id);
+    
+    // Generate AI Script
+    const message = await generateFollowUpMessage(
+      sale.clientName || 'Cliente', 
+      sale.description, 
+      sale.amount, 
+      sale.date
+    );
+
+    setLoadingMsgId(null);
+
+    // Clean phone number (remove non-digits)
+    const cleanPhone = sale.phone.replace(/\D/g, '');
+    const finalPhone = cleanPhone.length >= 10 ? cleanPhone : ''; // Basic validation
+    
+    // Create WhatsApp Link
+    const url = `https://wa.me/${finalPhone}?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
+  };
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-      <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="p-6 border-b border-gray-100 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
         <h3 className="text-lg font-semibold text-gray-800">Historial de Transacciones</h3>
         
-        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-          <div className="relative">
+        <div className="flex flex-col sm:flex-row flex-wrap gap-3 w-full lg:w-auto">
+          {/* Search */}
+          <div className="relative flex-grow sm:flex-grow-0 w-full sm:w-auto">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input 
               type="text" 
@@ -62,22 +108,49 @@ export const SalesHistory: React.FC<SalesHistoryProps> = ({ sales, onDeleteSale,
             />
           </div>
           
-          <div className="relative">
+          {/* Category Filter */}
+          <div className="relative flex-grow sm:flex-grow-0">
             <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <select
               value={filterCategory}
               onChange={(e) => setFilterCategory(e.target.value)}
-              className="pl-9 pr-8 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none w-full bg-white appearance-none"
+              className="pl-9 pr-8 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none w-full bg-white appearance-none min-w-[140px]"
             >
-              <option value="All">Todas las Categorías</option>
+              <option value="All">Categoría: Todas</option>
               <option value={SaleCategory.PRODUCT}>{SaleCategory.PRODUCT}</option>
               <option value={SaleCategory.SERVICE}>{SaleCategory.SERVICE}</option>
             </select>
           </div>
 
+          {/* Fabric Filter */}
+          <div className="relative flex-grow sm:flex-grow-0">
+            <Scissors className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <select
+              value={filterFabric}
+              onChange={(e) => setFilterFabric(e.target.value)}
+              className="pl-9 pr-8 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none w-full bg-white appearance-none min-w-[140px]"
+            >
+              <option value="All">Tela: Todas</option>
+              {uniqueFabrics.map(f => <option key={f} value={f}>{f}</option>)}
+            </select>
+          </div>
+
+          {/* Color Filter */}
+           <div className="relative flex-grow sm:flex-grow-0">
+            <Palette className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <select
+              value={filterColor}
+              onChange={(e) => setFilterColor(e.target.value)}
+              className="pl-9 pr-8 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none w-full bg-white appearance-none min-w-[140px]"
+            >
+              <option value="All">Color: Todos</option>
+               {uniqueColors.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+
           <button 
             onClick={handleExport}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-green-50 text-green-700 font-medium rounded-lg hover:bg-green-100 transition text-sm whitespace-nowrap"
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-green-50 text-green-700 font-medium rounded-lg hover:bg-green-100 transition text-sm whitespace-nowrap ml-auto sm:ml-0"
           >
             <Download className="w-4 h-4" />
             Excel
@@ -152,10 +225,29 @@ export const SalesHistory: React.FC<SalesHistoryProps> = ({ sales, onDeleteSale,
                   </td>
                    <td className="px-6 py-4 text-right align-top">
                     <div className="flex justify-end gap-2">
+                       {/* Smart WhatsApp Button */}
+                       {sale.phone && (
+                        <button
+                          onClick={() => handleSmartWhatsApp(sale)}
+                          disabled={loadingMsgId === sale.id}
+                          className="text-white bg-green-500 hover:bg-green-600 hover:scale-110 transition p-1.5 rounded-full shadow-sm flex items-center justify-center relative group/btn"
+                          title="Generar mensaje IA y enviar por WhatsApp"
+                        >
+                          {loadingMsgId === sale.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <>
+                              <MessageCircle className="w-4 h-4" />
+                              <Sparkles className="w-2 h-2 absolute -top-1 -right-1 text-yellow-300 animate-pulse" />
+                            </>
+                          )}
+                        </button>
+                      )}
+
                       {onEditSale && (
                         <button
                           onClick={() => onEditSale(sale)}
-                          className="text-gray-400 hover:text-indigo-600 transition p-1 rounded-md hover:bg-indigo-50"
+                          className="text-gray-400 hover:text-indigo-600 transition p-1.5 rounded-md hover:bg-indigo-50"
                           title="Editar venta"
                         >
                           <Pencil className="w-4 h-4" />
@@ -167,7 +259,7 @@ export const SalesHistory: React.FC<SalesHistoryProps> = ({ sales, onDeleteSale,
                                   onDeleteSale(sale.id);
                               }
                           }}
-                          className="text-gray-400 hover:text-red-600 transition p-1 rounded-md hover:bg-red-50"
+                          className="text-gray-400 hover:text-red-600 transition p-1.5 rounded-md hover:bg-red-50"
                           title="Eliminar venta"
                       >
                           <Trash2 className="w-4 h-4" />

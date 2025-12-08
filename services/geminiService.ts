@@ -42,6 +42,43 @@ export const generateMotivationalTip = async (
   }
 };
 
+// Nueva función para generar guiones de venta para WhatsApp
+export const generateFollowUpMessage = async (
+  clientName: string,
+  product: string,
+  amount: number,
+  date: string
+): Promise<string> => {
+  const ai = getClient();
+  if (!ai) return `Hola ${clientName}, gracias por tu compra de ${product}.`;
+
+  const prompt = `
+    Genera un mensaje corto, profesional y persuasivo para enviar por WhatsApp a un cliente.
+    
+    Contexto:
+    - Cliente: ${clientName || 'Estimado cliente'}
+    - Compró: ${product}
+    - Fecha: ${date}
+    - Valor: $${amount}
+    
+    Objetivo del mensaje: Agradecer la compra y sutilmente ofrecer soporte o mencionar que tenemos nuevos modelos, para fomentar una futura recompra o recomendación.
+    
+    Tono: Amable, cercano (tipo WhatsApp Business), emojis moderados.
+    Formato: Solo el texto del mensaje, listo para copiar/pegar. Sin comillas ni explicaciones extra.
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+    });
+    return response.text?.trim() || `Hola ${clientName}, muchas gracias por tu confianza al adquirir ${product}. Estamos a la orden.`;
+  } catch (error) {
+    console.error("Error generating script:", error);
+    return `Hola ${clientName}, gracias por tu compra.`;
+  }
+};
+
 export const chatWithGemini = async (
   message: string,
   contextData: string
@@ -57,19 +94,25 @@ export const chatWithGemini = async (
         thinkingConfig: {
           thinkingBudget: 32768, // Max budget for deep reasoning
         },
-        systemInstruction: `Eres un asistente inteligente experto en ventas y análisis de datos para la aplicación "Meta 1 Millón".
+        systemInstruction: `Eres el "Director Comercial AI" del negocio "Meta 1 Millón". Tu objetivo es asegurar que el usuario llegue a $1,000,000 en ventas.
         
-        CONTEXTO ACTUAL DE LA CAMPAÑA:
+        INFORMACIÓN Y RECURSOS:
+        1.  **WhatsApp Business:** Es nuestra herramienta principal. El número del negocio es 5652146268.
+        2.  **Datos en Tiempo Real:** Tienes acceso al reporte completo del negocio a continuación. Úsalo para basar tus respuestas en hechos, no suposiciones.
+        
+        REPORTE DE DATOS ACTUAL:
         ${contextData}
 
-        TU OBJETIVO:
-        Ayudar al usuario a analizar su progreso, sugerir estrategias de venta, calcular proyecciones y resolver dudas complejas sobre su desempeño.
+        TU METODOLOGÍA (Reasoning):
+        1.  **Analiza:** Mira los números. ¿Vamos bien? ¿Falta mucho? ¿Qué categoría (Productos vs Servicios) se vende más?
+        2.  **Diagnostica:** Si la semana actual está baja, identifica por qué.
+        3.  **Acciona:** Sugiere estrategias concretas, especialmente usando WhatsApp.
+            *   Ejemplo: "Veo que las ventas de Servicios están bajas. Redactaré un mensaje para que envíes por WhatsApp a tus 5 mejores clientes ofreciendo una revisión gratuita."
         
-        INSTRUCCIONES:
-        1. Utiliza tu capacidad de razonamiento profundo (Thinking Mode) para analizar los datos antes de responder.
-        2. Sé empático pero orientado a resultados.
-        3. Da respuestas claras y accionables.
-        4. Si te piden cálculos, explica brevemente tu razonamiento.
+        ESTILO DE RESPUESTA:
+        *   Directo, motivador y orientado a la acción.
+        *   Si el usuario pide ayuda para vender, **redacta el mensaje de WhatsApp** listo para copiar y pegar.
+        *   Usa emojis estratégicamente para resaltar puntos clave.
         `
       }
     });

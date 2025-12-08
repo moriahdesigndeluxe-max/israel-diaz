@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { PlusCircle, Zap, Save, X, User, Home, Phone, Palette, Box, Scissors } from 'lucide-react';
+import { PlusCircle, Zap, Save, X, User, Home, Phone, Palette, Box, Scissors, FastForward } from 'lucide-react';
 import { SaleCategory, Sale } from '../types';
 
 interface SalesEntryProps {
@@ -95,6 +95,36 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({
     setCategory(SaleCategory.PRODUCT);
   };
 
+  const handleInstantSale = () => {
+    const today = new Date().toISOString().split('T')[0];
+    const defaultAmount = "1000"; // Valor sugerido
+
+    // Usamos prompt para ser lo más rápido posible sin formularios
+    const inputAmount = window.prompt("Ingresa el monto para la Venta Rápida:", defaultAmount);
+
+    if (inputAmount !== null) {
+      const parsedAmount = parseFloat(inputAmount);
+      if (!isNaN(parsedAmount) && parsedAmount > 0) {
+        const saleData = {
+          date: today,
+          description: "Venta Rápida / Mostrador",
+          category: SaleCategory.PRODUCT,
+          amount: parsedAmount,
+          fabric: '',
+          color: '',
+          clientName: 'Cliente General',
+          address: '',
+          phone: ''
+        };
+        onAddSale(saleData);
+        // Reiniciamos el formulario por si había datos parciales
+        resetForm();
+      } else {
+        alert("Por favor ingresa un monto válido.");
+      }
+    }
+  };
+
   const isEditing = !!editingSale;
 
   return (
@@ -128,6 +158,14 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({
           <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1 w-full sm:w-auto mb-2 sm:mb-0">
             <Zap className="w-4 h-4 text-yellow-500" /> Accesos Rápidos:
           </span>
+          <button
+            type="button"
+            onClick={handleInstantSale}
+            className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white border border-transparent px-3 py-2 rounded-md transition-all duration-200 shadow-sm hover:shadow-md font-medium flex items-center gap-1"
+          >
+            <FastForward className="w-3 h-3" /> Registrar Venta Rápida
+          </button>
+          <div className="h-6 w-px bg-gray-300 mx-1 hidden sm:block"></div>
           <button
             type="button"
             onClick={() => fillQuickAction("Sala Moriah de 3 reclinables")}
@@ -208,7 +246,7 @@ export const SalesEntry: React.FC<SalesEntryProps> = ({
                 </div>
                 <div>
                    <label className="block text-xs text-gray-500 mb-1 flex items-center gap-1">
-                     <Scissors className="w-3 h-3" /> Tipo de Tela
+                     <Scissors className="w-3 h-3 text-indigo-500" /> Tipo de Tela
                    </label>
                    <input
                       type="text"
